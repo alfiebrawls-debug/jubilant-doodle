@@ -18,8 +18,17 @@ const VIEWS = {
 
 export default function App() {
   const { view, exportOpen } = useApp();
-  const { session } = useAuth();
+  const { session, authLoading } = useAuth();
   const ActiveView = VIEWS[view] ?? Dashboard;
+
+  // Boot splash while Supabase restores a persisted session
+  if (authLoading) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-space-900">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-violet border-t-transparent" />
+      </div>
+    );
+  }
 
   if (!session) return <AuthScreen />;
 

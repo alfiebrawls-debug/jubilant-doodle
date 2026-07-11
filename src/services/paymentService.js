@@ -36,8 +36,11 @@ export const paymentService = {
       status: 'success',
       tierId,
       subscriptionId: `sub_mock_${userId.slice(-4)}_${Date.now().toString(36)}`,
-      // PRODUCTION: nothing sensitive returns to the client — the webhook
-      // updates the user's profile and the client refetches the session.
+      // PRODUCTION: nothing sensitive returns to the client — the Stripe /
+      // App Store webhook updates clipforge_profiles.tier_id with the
+      // service_role key and the client refetches its profile. The demo
+      // wires this through the demo_upgrade_tier() RPC instead (see
+      // authService.applyTier), which must be revoked before launch.
     };
   },
 

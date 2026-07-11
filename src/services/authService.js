@@ -1,124 +1,124 @@
 /**
- * Authentication & entitlement service — MOCK IMPLEMENTATION.
+ * Authentication & entitlement service — REAL SUPABASE IMPLEMENTATION.
  *
- * This module is the ONLY place the rest of the app talks to for identity
- * and usage credits. Its public API is designed to map 1:1 onto a real
- * backend, so going to production is a rewrite of this file, not the app.
+ * Identity lives in Supabase Auth; entitlements live in the
+ * `public.clipforge_profiles` table (see supabase/migrations/). The
+ * security-critical rules are enforced by the DATABASE, not this file:
  *
- * ┌─ PRODUCTION INTEGRATION ────────────────────────────────────────────┐
- * │ Supabase:  signIn → supabase.auth.signInWithOtp / signInWithOAuth   │
- * │            session → supabase.auth.getSession() + onAuthStateChange │
- * │            credits → a `profiles.forge_credits` column guarded by   │
- * │            RLS; consume via an edge function (atomic decrement).    │
- * │ Firebase:  signIn → firebase/auth signInWithEmailLink / popup       │
- * │            credits → Firestore doc + a callable Cloud Function.     │
- * │ Native:    wrap in Capacitor/React Native; store tokens in the      │
- * │            platform keychain, NOT localStorage.                     │
- * │                                                                     │
- * │ ⚠ Credits and tier MUST be enforced server-side. The client-side    │
- * │   checks in this app are UX only — a paying customer's entitlement  │
- * │   is whatever your backend says it is.                              │
- * └─────────────────────────────────────────────────────────────────────┘
+ *   * RLS: users can only SELECT their own profile row; there are no
+ *     client write policies at all.
+ *   * Credits change only through SECURITY DEFINER functions:
+ *       consume_forge_credit()  — atomic guarded decrement; the check
+ *                                 and the debit are one UPDATE, so two
+ *                                 concurrent forges can't both win the
+ *                                 last credit
+ *       refund_forge_credit()   — compensating credit on failed forges
+ *   * demo_upgrade_tier() lets the demo paywall complete without a
+ *     billing backend. PRODUCTION: revoke it and set tier_id from your
+ *     Stripe / App Store webhook using the service_role key instead.
  */
 
-import { getTier } from '../data/pricingData.js';
+import { supabase } from '../lib/supabaseClient.js';
 
-const STORAGE_KEY = 'clipforge.session.v1';
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function readStorage() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStorage(session) {
-  try {
-    if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-    else localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* storage unavailable (private mode) — session stays in-memory only */
-  }
+/** Map a DB profile row to the session shape the UI consumes. */
+function toProfile(row) {
+  if (!row) return null;
+  return {
+    tierId: row.tier_id,
+    // NULL in the DB means unlimited (paid tiers)
+    creditsRemaining: row.forge_credits === null ? Infinity : row.forge_credits,
+    displayName: row.display_name,
+    email: row.email,
+  };
 }
 
 export const authService = {
   /**
-   * Restore a persisted session on app boot.
-   * PRODUCTION: supabase.auth.getSession() / firebase onAuthStateChanged.
+   * Subscribe to auth changes (initial session, sign-in, sign-out, token
+   * refresh). Returns an unsubscribe function.
    */
-  getStoredSession() {
-    return readStorage();
+  onAuthChange(callback) {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      // Defer: making Supabase calls directly inside this callback can
+      // deadlock (documented supabase-js behavior).
+      setTimeout(() => callback(event, session), 0);
+    });
+    return () => data.subscription.unsubscribe();
   },
 
   /**
-   * Mock email sign-in. Any email works; new users start on Free with
-   * exactly 1 forge credit.
-   * PRODUCTION: replace with your provider's sign-in and fetch the
-   * user's profile row (tier + credits) after auth succeeds.
+   * Email + password sign-up. The `on_auth_user_created_clipforge` DB
+   * trigger provisions the profile row with 1 free forge credit.
+   * If email confirmations are enabled, no session is returned until the
+   * user clicks the link — the caller shows a "check your inbox" notice.
    */
-  async signIn(email) {
-    await delay(700);
-    const session = {
-      user: {
-        id: `usr_${btoa(email).slice(0, 10)}`,
-        email,
-        name: email.split('@')[0].replace(/[._-]/g, ' '),
-      },
-      tierId: 'free',
-      creditsRemaining: getTier('free').forgeCredits,
-      createdAt: new Date().toISOString(),
-    };
-    writeStorage(session);
-    return session;
+  async signUp(email, password) {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) return { error: error.message };
+    return { needsEmailConfirmation: !data.session };
   },
 
-  /** PRODUCTION: supabase.auth.signOut() / firebase signOut(). */
+  /** Email + password sign-in. */
+  async signIn(email, password) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error: error?.message ?? null };
+  },
+
   async signOut() {
-    await delay(250);
-    writeStorage(null);
+    await supabase.auth.signOut();
+  },
+
+  /** Fetch the calling user's profile (RLS scopes the query to them). */
+  async fetchProfile() {
+    const { data, error } = await supabase
+      .from('clipforge_profiles')
+      .select('tier_id, forge_credits, display_name, email')
+      .single();
+    if (error) {
+      console.error('fetchProfile failed:', error.message);
+      return null;
+    }
+    return toProfile(data);
   },
 
   /**
-   * Atomically consume one forge credit. Returns the updated session, or
-   * null if the user has no credits left (caller shows the paywall).
-   * PRODUCTION: this MUST be a server call (edge function / callable
-   * function) that decrements atomically and returns the new balance —
-   * never trust a client-side counter.
+   * Atomically consume one forge credit server-side.
+   * Returns { allowed, creditsRemaining } — creditsRemaining is Infinity
+   * for unlimited tiers. The client never computes the balance itself.
    */
-  async consumeForgeCredit(session) {
-    await delay(150);
-    if (session.creditsRemaining === Infinity) return session;
-    if (session.creditsRemaining <= 0) return null;
-    const updated = { ...session, creditsRemaining: session.creditsRemaining - 1 };
-    writeStorage(updated);
-    return updated;
-  },
-
-  /** Refund a credit if a forge fails after the debit (mirror server-side). */
-  async refundForgeCredit(session) {
-    if (session.creditsRemaining === Infinity) return session;
-    const updated = { ...session, creditsRemaining: session.creditsRemaining + 1 };
-    writeStorage(updated);
-    return updated;
-  },
-
-  /**
-   * Apply a new tier after a successful purchase.
-   * PRODUCTION: never called directly from checkout UI — the billing
-   * provider's webhook (Stripe `checkout.session.completed`, App Store
-   * server notifications) updates the profile; the client just refetches.
-   */
-  async applyTier(session, tierId) {
-    await delay(200);
-    const updated = {
-      ...session,
-      tierId,
-      creditsRemaining: getTier(tierId).forgeCredits,
+  async consumeForgeCredit() {
+    const { data, error } = await supabase.rpc('consume_forge_credit');
+    if (error) {
+      console.error('consume_forge_credit failed:', error.message);
+      return { allowed: false, creditsRemaining: 0 };
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    return {
+      allowed: row?.allowed ?? false,
+      creditsRemaining:
+        row?.credits_remaining === null ? Infinity : (row?.credits_remaining ?? 0),
     };
-    writeStorage(updated);
-    return updated;
+  },
+
+  /** Give the credit back if the forge fails after the debit. */
+  async refundForgeCredit() {
+    const { data, error } = await supabase.rpc('refund_forge_credit');
+    if (error) {
+      console.error('refund_forge_credit failed:', error.message);
+      return null;
+    }
+    return data;
+  },
+
+  /**
+   * Apply a tier after checkout.
+   * DEMO: calls the self-service demo_upgrade_tier() RPC.
+   * PRODUCTION: delete this call — the billing webhook updates the row
+   * with the service_role key and the client simply refetches.
+   */
+  async applyTier(tierId) {
+    const { error } = await supabase.rpc('demo_upgrade_tier', { new_tier: tierId });
+    if (error) return { error: error.message };
+    return { error: null };
   },
 };
