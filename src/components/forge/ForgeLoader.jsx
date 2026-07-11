@@ -1,13 +1,19 @@
 import React from 'react';
-import { Flame } from 'lucide-react';
+import { Flame, Zap } from 'lucide-react';
 
 /**
  * Full-card processing state: pulsing forge icon, staged narration from
- * the mock pipeline, and a gradient progress bar.
+ * the mock pipeline, and a gradient progress bar. Paid tiers see the
+ * fast-lane badge (and genuinely shorter stage delays from the API).
  */
-export default function ForgeLoader({ progress }) {
+export default function ForgeLoader({ progress, fastLane = false }) {
   return (
-    <div className="card flex flex-col items-center px-6 py-16 text-center">
+    <div className="card relative flex flex-col items-center px-6 py-16 text-center">
+      {fastLane && (
+        <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-cyan/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-glow">
+          <Zap size={11} /> Priority fast-lane
+        </span>
+      )}
       <div className="relative mb-8 grid h-20 w-20 place-items-center">
         <span className="absolute inset-0 rounded-full bg-violet/30 animate-pulse-ring" />
         <span

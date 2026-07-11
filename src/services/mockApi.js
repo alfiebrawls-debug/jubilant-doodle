@@ -84,11 +84,14 @@ export const api = {
    * POST /forge
    * Generates the full clip package. Reports staged progress through
    * `onProgress({ pct, label })` so the loader can narrate the pipeline.
+   * `priority` (paid tiers) runs the fast lane — in production this maps
+   * to a higher-priority queue, here it just shortens the stage delays.
    */
-  async forgeClipPackage({ input, styleId, onProgress }) {
+  async forgeClipPackage({ input, styleId, priority = false, onProgress }) {
+    const speed = priority ? 0.45 : 1;
     for (const stage of PROCESSING_STAGES) {
       onProgress?.(stage);
-      await delay(420 + Math.random() * 380);
+      await delay((420 + Math.random() * 380) * speed);
     }
 
     const topic = extractTopic(input);

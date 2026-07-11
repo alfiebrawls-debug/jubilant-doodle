@@ -4,6 +4,11 @@
  * define the contract the UI is built against.
  */
 
+/**
+ * `minTier` gates each style: 'free' styles are available to everyone,
+ * 'pro' styles require Creator Pro or above (enforced in the UI and
+ * re-checked in the forge pipeline — in production, also server-side).
+ */
 export const STYLES = [
   {
     id: 'genz',
@@ -12,6 +17,7 @@ export const STYLES = [
     emoji: '⚡',
     accent: 'violet',
     tone: 'punchy, meme-aware, high-energy',
+    minTier: 'free',
   },
   {
     id: 'corporate',
@@ -20,6 +26,7 @@ export const STYLES = [
     emoji: '💼',
     accent: 'cyan',
     tone: 'polished, confident, data-backed',
+    minTier: 'free',
   },
   {
     id: 'storyteller',
@@ -28,6 +35,16 @@ export const STYLES = [
     emoji: '🎬',
     accent: 'violet',
     tone: 'warm, cinematic, suspense-driven',
+    minTier: 'pro',
+  },
+  {
+    id: 'hottake',
+    name: 'Hot Take',
+    tagline: 'Contrarian energy that sparks comments',
+    emoji: '🔥',
+    accent: 'cyan',
+    tone: 'provocative, debate-bait, confident',
+    minTier: 'pro',
   },
 ];
 
@@ -194,6 +211,41 @@ export const SCRIPT_TEMPLATES = {
       },
     ],
   },
+  hottake: {
+    hookLine: (topic) => `Unpopular opinion: everything you know about ${topic} is backwards`,
+    segments: [
+      {
+        label: 'HOOK',
+        visual: 'Direct-to-camera, eyebrow raise, caption slams in: "UNPOPULAR OPINION"',
+        broll: ['Record-scratch freeze frame', 'Comment section screenshot with hot replies'],
+        line: (topic) => `Hot take: ${topic} is completely overrated — and I can prove it in 40 seconds.`,
+      },
+      {
+        label: 'STAKE',
+        visual: 'Lean-in shot, tempo of cuts increases, ticking clock SFX',
+        broll: ['Montage of everyone doing the "normal" way', 'Red X overlay animation'],
+        line: () => `Everyone parrots the same advice. Nobody stops to ask if it actually works anymore.`,
+      },
+      {
+        label: 'EVIDENCE',
+        visual: 'Split screen: claim vs. receipt, numbers punch in one by one',
+        broll: ['Screenshot of the data', 'Green checkmark counter animation'],
+        line: (topic) => `I tested the opposite approach to ${topic} for 30 days. The results embarrassed the conventional wisdom.`,
+      },
+      {
+        label: 'FLIP',
+        visual: 'Camera pushes in, music cuts, dead-serious delivery',
+        broll: ['Slow-motion reaction shot', 'Before/after metric card'],
+        line: () => `So here's the uncomfortable part: the "wrong" way outperformed by 3x. Sit with that.`,
+      },
+      {
+        label: 'CTA',
+        visual: 'Smirk to camera, caption: "FIGHT ME IN THE COMMENTS"',
+        broll: ['Comment bubble animation raining down'],
+        line: () => `Disagree? Good. Tell me why in the comments — best counter-argument gets pinned.`,
+      },
+    ],
+  },
 };
 
 export const SOCIAL_TEMPLATES = {
@@ -246,6 +298,23 @@ export const SOCIAL_TEMPLATES = {
       tiktok: ['#storytime', '#journey', '#motivation', '#creatorstory', '#keepgoing'],
       reels: ['#storytelling', '#behindthescenes', '#creatorlife', '#inspiration'],
       shorts: ['#story', '#motivation', '#journey'],
+    },
+  },
+  hottake: {
+    hooks: [
+      (topic) => `unpopular opinion: ${topic} is overrated and here's the receipts`,
+      (topic) => `everyone is wrong about ${topic}. yes, including you.`,
+      (topic) => `I said what I said about ${topic} 🔥`,
+    ],
+    captions: [
+      (topic) => `Hot take incoming: the standard advice on ${topic} stopped working years ago. I tested the opposite for 30 days — receipts in the video. Fight me in the comments 🔥`,
+      (topic) => `This ${topic} opinion got me blocked by three gurus. Watch before it gets taken down 👀 best counter-argument gets pinned.`,
+      (topic) => `POV: you finally hear the ${topic} truth nobody with a course to sell will say out loud. Save this before you disagree.`,
+    ],
+    hashtags: {
+      tiktok: ['#hottake', '#unpopularopinion', '#debate', '#realtalk', '#fyp'],
+      reels: ['#hottake', '#controversial', '#realtalk', '#explorepage'],
+      shorts: ['#hottake', '#debate', '#truth'],
     },
   },
 };

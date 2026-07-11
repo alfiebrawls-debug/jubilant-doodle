@@ -1,6 +1,7 @@
 import React from 'react';
-import { Flame, LayoutDashboard, Hammer, Clapperboard, Settings, Zap } from 'lucide-react';
+import { Flame, LayoutDashboard, Hammer, Clapperboard, Settings, Zap, Users } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -13,6 +14,7 @@ const NAV_ITEMS = [
  */
 export default function Sidebar() {
   const { view, setView, clipPackage } = useApp();
+  const { tierId, tier, creditsRemaining, openPaywall } = useAuth();
 
   const navButton = (item, layout) => {
     const disabled = item.requiresPackage && !clipPackage;
@@ -62,17 +64,47 @@ export default function Sidebar() {
         </nav>
 
         <div className="mt-auto space-y-4">
-          <div className="gradient-border rounded-2xl p-4">
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
-              <Zap size={15} className="text-cyan" /> Pro Plan
+          {/* Plan card reflects the live session tier + credit balance */}
+          {tierId === 'free' ? (
+            <div className="gradient-border rounded-2xl p-4">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
+                <Zap size={15} className="text-cyan" /> Free Plan
+              </div>
+              <p className="text-xs leading-relaxed text-slate-400">
+                {creditsRemaining > 0
+                  ? `${creditsRemaining} of 1 forge credit remaining.`
+                  : 'Your free forge credit is used up.'}
+              </p>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-space-700">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-violet to-cyan transition-all"
+                  style={{ width: `${(1 - creditsRemaining) * 100}%` }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => openPaywall('upgrade')}
+                className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet to-cyan py-2 text-xs font-bold text-white transition-transform hover:scale-[1.02]"
+              >
+                Upgrade — from $19/mo
+              </button>
             </div>
-            <p className="text-xs leading-relaxed text-slate-400">
-              23 / 50 clips forged this month. Upgrade for unlimited forging.
-            </p>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-space-700">
-              <div className="h-full w-[46%] rounded-full bg-gradient-to-r from-violet to-cyan" />
+          ) : (
+            <div className="gradient-border rounded-2xl p-4">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
+                {tierId === 'agency' ? (
+                  <Users size={15} className="text-cyan" />
+                ) : (
+                  <Zap size={15} className="text-cyan" />
+                )}
+                {tier.name}
+              </div>
+              <p className="text-xs leading-relaxed text-slate-400">
+                Unlimited forges · priority fast-lane
+                {tierId === 'agency' ? ' · 5 team seats' : ''}
+              </p>
             </div>
-          </div>
+          )}
           <button
             type="button"
             className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-200"

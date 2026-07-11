@@ -1,6 +1,7 @@
 import React from 'react';
 import { Eye, Timer, FolderKanban, Scissors, ArrowRight, Sparkles } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 import SectionHeader from '../ui/SectionHeader.jsx';
 import StatCard from './StatCard.jsx';
 import TrendChart from './TrendChart.jsx';
@@ -11,6 +12,8 @@ const formatCompact = (n) =>
 
 export default function Dashboard() {
   const { analytics, projects, isBootstrapping, setView } = useApp();
+  const { session } = useAuth();
+  const firstName = session?.user.name.split(' ')[0] ?? 'creator';
 
   if (isBootstrapping) {
     return (
@@ -30,7 +33,11 @@ export default function Dashboard() {
     <div className="animate-fade-up">
       <SectionHeader
         eyebrow="Overview"
-        title="Welcome back, Alfie 👋"
+        title={
+          <>
+            Welcome back, <span className="capitalize">{firstName}</span> 👋
+          </>
+        }
         subtitle="Your content pipeline at a glance — here's what ClipForge saved you this month."
         actions={
           <button

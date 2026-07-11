@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Link2, AlertTriangle, Hammer, Wand2 } from 'lucide-react';
+import { Link2, AlertTriangle, Hammer, Wand2, Zap } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 import SectionHeader from '../ui/SectionHeader.jsx';
 import StyleSelector from './StyleSelector.jsx';
 import ForgeLoader from './ForgeLoader.jsx';
@@ -9,10 +10,12 @@ const EXAMPLE_INPUT = 'https://youtube.com/watch?v=morning-routines-of-top-creat
 
 export default function ForgeWorkspace() {
   const { forge, forgeStatus, progress, resetForge } = useApp();
+  const { isPaid, creditsRemaining, openPaywall } = useAuth();
   const [input, setInput] = useState('');
   const [styleId, setStyleId] = useState('genz');
 
   const canForge = input.trim().length >= 8 && forgeStatus !== 'processing';
+  const outOfCredits = !isPaid && creditsRemaining <= 0;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -27,7 +30,7 @@ export default function ForgeWorkspace() {
           title="Working the metal…"
           subtitle="Sit tight — we're mining your content for its most viral moments."
         />
-        <ForgeLoader progress={progress} />
+        <ForgeLoader progress={progress} fastLane={isPaid} />
       </div>
     );
   }
@@ -81,6 +84,8 @@ export default function ForgeWorkspace() {
           <StyleSelector selected={styleId} onSelect={setStyleId} />
         </div>
 
+        {/* The button stays clickable when out of credits — the attempt is
+            intercepted in forge() and lands on the paywall by design. */}
         <button
           type="submit"
           disabled={!canForge}
@@ -94,7 +99,25 @@ export default function ForgeWorkspace() {
           Forge Clip Package
         </button>
         <p className="-mt-4 text-center text-xs text-slate-600">
-          Avg. forge time: ~4 seconds · Costs 1 clip credit
+          {isPaid ? (
+            <span className="inline-flex items-center gap-1">
+              <Zap size={11} className="text-cyan-glow" /> Unlimited forges · priority
+              fast-lane processing
+            </span>
+          ) : outOfCredits ? (
+            <span className="text-amber-400/90">
+              0 free credits left —{' '}
+              <button
+                type="button"
+                onClick={() => openPaywall('out-of-credits')}
+                className="font-semibold text-cyan-glow underline underline-offset-2"
+              >
+                upgrade to keep forging
+              </button>
+            </span>
+          ) : (
+            `${creditsRemaining} free forge credit remaining · standard processing`
+          )}
         </p>
       </form>
     </div>

@@ -1,11 +1,14 @@
 import React from 'react';
 import { useApp } from './context/AppContext.jsx';
+import { useAuth } from './context/AuthContext.jsx';
 import Sidebar from './components/layout/Sidebar.jsx';
 import TopBar from './components/layout/TopBar.jsx';
 import Dashboard from './components/dashboard/Dashboard.jsx';
 import ForgeWorkspace from './components/forge/ForgeWorkspace.jsx';
 import OutputStudio from './components/studio/OutputStudio.jsx';
 import ExportModal from './components/export/ExportModal.jsx';
+import AuthScreen from './components/auth/AuthScreen.jsx';
+import PricingModal from './components/paywall/PricingModal.jsx';
 
 const VIEWS = {
   dashboard: Dashboard,
@@ -15,7 +18,10 @@ const VIEWS = {
 
 export default function App() {
   const { view, exportOpen } = useApp();
+  const { session } = useAuth();
   const ActiveView = VIEWS[view] ?? Dashboard;
+
+  if (!session) return <AuthScreen />;
 
   return (
     <div className="min-h-screen flex bg-space-900">
@@ -35,6 +41,7 @@ export default function App() {
       </div>
 
       {exportOpen && <ExportModal />}
+      <PricingModal />
     </div>
   );
 }
